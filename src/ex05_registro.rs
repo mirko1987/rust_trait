@@ -26,20 +26,17 @@ pub struct RegistryFull<T> {
 }
 
 pub struct Registry<T> {
-    // Design the fields yourself (private).
-    _placeholder: std::marker::PhantomData<T>,
+    items: Vec<T>,
+    capacity: usize,
 }
 
 impl<T> Registry<T> {
     /// Creates a new, empty registry with the given `capacity`.
-    ///
-    /// TODO: implement this. Store the capacity and an empty container
-    /// (e.g. `Vec<T>`) in the struct's fields — you'll need to replace the
-    /// `_placeholder: PhantomData<T>` field above with real fields, since
-    /// `PhantomData` cannot actually hold values.
     pub fn new(capacity: usize) -> Self {
-        let _ = capacity;
-        todo!()
+        Registry {
+            items: Vec::with_capacity(capacity),
+            capacity,
+        }
     }
 
     /// Inserts `item` if there is still room. Otherwise returns it back to
@@ -51,8 +48,12 @@ impl<T> Registry<T> {
     /// error, not lost or cloned. Edge case: capacity `0` must always reject
     /// the very first insertion.
     pub fn insert(&mut self, item: T) -> Result<(), RegistryFull<T>> {
-        let _ = item;
-        todo!()
+      if self.is_full() {
+        return Err(RegistryFull{item});
+      }
+      self.items.push(item);
+      Ok(())
+      
     }
 
     /// Number of items currently stored.
@@ -60,7 +61,7 @@ impl<T> Registry<T> {
     /// TODO: implement this. Simply return the length of the underlying
     /// container.
     pub fn count(&self) -> usize {
-        todo!()
+        self.items.len()
     }
 
     /// Whether the registry has reached its capacity.
@@ -68,7 +69,7 @@ impl<T> Registry<T> {
     /// TODO: implement this. Compare `count()` against the stored capacity
     /// (`>=`, so that a capacity of `0` is considered full immediately).
     pub fn is_full(&self) -> bool {
-        todo!()
+        self.count()>=self.capacity
     }
 }
 
@@ -79,8 +80,7 @@ impl<T: PartialEq> Registry<T> {
     /// `PartialEq` comparison over the stored items; this block only
     /// requires `PartialEq`, not `Eq` or `Ord`.
     pub fn contains(&self, target: &T) -> bool {
-        let _ = target;
-        todo!()
+        self.items.iter().any(|item| item==target)
     }
 }
 
@@ -93,7 +93,7 @@ impl<T: PartialOrd> Registry<T> {
     /// a.partial_cmp(b).unwrap())` or an explicit fold that keeps the larger
     /// of two items at each step.
     pub fn maximum(&self) -> Option<&T> {
-        todo!()
+        self.items.iter().max_by(|a,b| a.partial_cmp(b).unwrap())
     }
 }
 
@@ -106,7 +106,12 @@ impl<T: std::fmt::Display> Registry<T> {
     /// with `'\n'` (e.g. with `.collect::<Vec<_>>().join("\n")`). Edge case:
     /// an empty registry should produce an empty string.
     pub fn listing(&self) -> String {
-        todo!()
+       self.items
+            .iter()
+            .enumerate()
+            .map(|(i, item)| format!("{}. {}", i + 1, item))
+            .collect::<Vec<_>>()
+            .join("\n")
     }
 }
 

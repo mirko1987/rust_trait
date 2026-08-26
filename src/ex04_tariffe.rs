@@ -60,7 +60,7 @@ impl Rate for Express {
     /// TODO: implement this — return
     /// `Ok(self.flat_fee + weight_kg * self.rate_per_kg)`.
     fn cost(&self, weight_kg: f64) -> Result<f64, RateError> {
-       Ok(self.flat_free + weight_kg *self.rate_per_kg)
+       Ok(self.flat_fee + weight_kg * self.rate_per_kg)
     }
 }
 
@@ -89,8 +89,8 @@ impl Rate for StorePickup {
 /// with `?`, then format the `Ok` value with exactly two decimals as
 /// `"Costo: X.XX€"` (e.g. `format!("Costo: {:.2}€", value)`).
 pub fn quote(weight_kg: f64, rate: &impl Rate) -> Result<String, RateError> {
-    let value = rate.cost(weight_kg)?
-    Ok(("Costo: {:.2}€", value))
+    let value = rate.cost(weight_kg)?;
+    Ok(format!("Costo: {:.2}€", value))
 }
 
 /// The cheapest among the eligible rates, over a homogeneous slice.
