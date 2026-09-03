@@ -34,7 +34,8 @@ pub trait Source {
 
 pub struct MemoryBuffer {
     // Design the internal state yourself (data + current position).
-    _data: Vec<String>,
+    data: Vec<String>,
+    cursor:usize,
 }
 
 impl MemoryBuffer {
@@ -46,14 +47,15 @@ impl MemoryBuffer {
     /// `Vec` in something you can pop from the front of). Feel free to
     /// change the `_data` field above (and add others) to fit your design.
     pub fn new(data: Vec<String>) -> Self {
-        let _ = data;
-        todo!()
+       MemoryBuffer{data,cursor:0}
+        
     }
 }
 
 pub struct Counter {
     // Generates the numbers from 1 to up_to, inclusive.
-    _up_to: u32,
+    up_to: u32,
+    next_value:u32
 }
 
 impl Counter {
@@ -68,12 +70,13 @@ impl Counter {
     /// `Counter::new(0)`).
     pub fn new(up_to: u32) -> Self {
         let _ = up_to;
-        todo!()
+       Counter{up_to,next_value:1}
     }
 }
 
 pub struct Batched {
-    _batches: Vec<Vec<i32>>,
+    batches: Vec<Vec<i32>>,
+    cursor:usize,
 }
 
 impl Batched {
@@ -84,8 +87,7 @@ impl Batched {
     /// batches plus a cursor so `Source::next` can hand out one `Vec<i32>`
     /// per call and return `None` once they're exhausted.
     pub fn new(batches: Vec<Vec<i32>>) -> Self {
-        let _ = batches;
-        todo!()
+        Batched{batches,cursor:0}
     }
 }
 
@@ -95,7 +97,12 @@ impl Batched {
 impl Source for MemoryBuffer {
     type Item = String;
     fn next(&mut self) -> Option<String> {
-        todo!()
+      if self.cursor >= self.data.len(){
+        return None;
+      }
+      let item = self.data[self.cursor].clone();
+      self.cursor+=1;
+      Some(item)
     }
 }
 
@@ -105,7 +112,12 @@ impl Source for MemoryBuffer {
 impl Source for Counter {
     type Item = u32;
     fn next(&mut self) -> Option<u32> {
-        todo!()
+        if self.next_value > self.up_to {
+            return None;
+        }
+        let item = self.next_value;
+        self.next_value += 1;
+        Some(item)
     }
 }
 
@@ -114,7 +126,12 @@ impl Source for Counter {
 impl Source for Batched {
     type Item = Vec<i32>;
     fn next(&mut self) -> Option<Vec<i32>> {
-        todo!()
+       if self.cursor >= self.batches.len() {
+        return None;
+       }
+       let item = self.batches[self.cursor].clone();
+       self.cursor += 1;
+       Some(item)
     }
 }
 
@@ -123,9 +140,14 @@ impl Source for Batched {
 /// TODO: implement this. Loop calling `source.next()` until it returns
 /// `None`, pushing each `Some(item)` into a `Vec` that you return at the
 /// end. An empty source must yield an empty `Vec`.
-pub fn download_all<S: Source>(source: S) -> Vec<S::Item> {
-    let _ = source;
-    todo!()
+pub fn download_all<S: Source>(mut source: S) -> Vec<S::Item> {
+    let mut result: Vec<S::Item> = Vec::new();
+
+    while let Some(item) = source.next() {
+        result.push(item);
+    }
+
+    result
 }
 
 /// Human-readable summary of the source: the first 3 elements (formatted
@@ -145,8 +167,21 @@ where
     S: Source,
     S::Item: Display,
 {
-    let _ = source;
-    todo!()
+    let elements = download_all(source);
+
+    if elements.is_empty() {
+        return "vuoto".to_string();
+    }
+
+    let take = elements.len().min(3);
+    let first: Vec<String> = elements[..take].iter().map(|e| e.to_string()).collect();
+    let mut result = first.join(", ");
+
+    if elements.len() > 3 {
+        result.push_str(&format!(" ... e altri {}", elements.len() - 3));
+    }
+
+    result
 }
 
 // ---- Version with generic on the trait: educational comparison ----
@@ -159,7 +194,12 @@ pub trait SourceGen<E> {
 /// `MemoryBuffer`: return the next string in order, `None` once exhausted.
 impl SourceGen<String> for MemoryBuffer {
     fn next_gen(&mut self) -> Option<String> {
-        todo!()
+        if self.cursor >= self.data.len() {
+            return None;
+        }
+        let item = self.data[self.cursor].clone();
+        self.cursor += 1;
+        Some(item)
     }
 }
 
@@ -172,7 +212,12 @@ impl SourceGen<String> for MemoryBuffer {
 /// each string.
 impl SourceGen<usize> for MemoryBuffer {
     fn next_gen(&mut self) -> Option<usize> {
-        todo!()
+        if self.cursor >= self.data.len() {
+            return None;
+        }
+        let len = self.data[self.cursor].len();
+        self.cursor += 1;
+        Some(len)
     }
 }
 

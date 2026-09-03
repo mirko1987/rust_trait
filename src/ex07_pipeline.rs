@@ -45,7 +45,7 @@ pub trait Transformation {
 /// the concrete type behind a `dyn Trait` at compile time).
 impl Clone for Box<dyn Transformation> {
     fn clone(&self) -> Self {
-        todo!()
+       self.clone_box()
     }
 }
 
@@ -78,13 +78,10 @@ impl Transformation for Trim {
     /// Edge case: an empty or all-whitespace input should produce an empty
     /// string.
     fn apply(&self, text: &str) -> String {
-        let _ = text;
-        todo!()
+        text.split_whitespace().collect::<Vec<_>>().join(" ")
     }
-    /// TODO: implement this. `Trim` is a unit struct that derives `Clone`,
-    /// so the body is just `Box::new(self.clone())`.
     fn clone_box(&self) -> Box<dyn Transformation> {
-        todo!()
+        Box::new(self.clone())
     }
 }
 
@@ -97,13 +94,10 @@ impl Transformation for Upper {
     /// would also work for plain ASCII input, but `to_uppercase` is the more
     /// general/correct choice for Unicode).
     fn apply(&self, text: &str) -> String {
-        let _ = text;
-        todo!()
+        text.to_uppercase()
     }
-    /// TODO: implement this. Same pattern as `Trim::clone_box`:
-    /// `Box::new(self.clone())`.
     fn clone_box(&self) -> Box<dyn Transformation> {
-        todo!()
+        Box::new(self.clone())
     }
 }
 
@@ -120,13 +114,13 @@ impl Transformation for Censor {
     /// `text` unchanged (make sure your approach doesn't loop forever or
     /// insert asterisks between every character in that case).
     fn apply(&self, text: &str) -> String {
-        let _ = text;
-        todo!()
+        if self.word.is_empty() {
+            return text.to_string();
+        }
+        text.replace(&self.word, &"*".repeat(self.word.len()))
     }
-    /// TODO: implement this. Same pattern as `Trim::clone_box`:
-    /// `Box::new(self.clone())`.
     fn clone_box(&self) -> Box<dyn Transformation> {
-        todo!()
+        Box::new(self.clone())
     }
 }
 
@@ -142,13 +136,10 @@ impl Transformation for Truncate {
     /// prefer `text.chars().take(self.max).collect::<String>()`, which
     /// truncates by character count rather than by byte offset.
     fn apply(&self, text: &str) -> String {
-        let _ = text;
-        todo!()
+        text.chars().take(self.max).collect()
     }
-    /// TODO: implement this. Same pattern as `Trim::clone_box`:
-    /// `Box::new(self.clone())`.
     fn clone_box(&self) -> Box<dyn Transformation> {
-        todo!()
+        Box::new(self.clone())
     }
 }
 
@@ -170,8 +161,17 @@ impl fmt::Display for ConfigError {
     /// variants via `PartialEq`, not the `Display` text), but every arm
     /// must return the `fmt::Result` produced by `write!`.
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let _ = f;
-        todo!()
+        match self{
+            ConfigError::UnknownTransformation(name)=>{
+                write!(f,"unknown trasformation:{name}")
+            }
+            ConfigError::MissingParameter(name)=>{
+                write!(f,"missing parameter for:{name}")
+            }
+             ConfigError::InvalidParameter { transformation, value } => {
+            write!(f, "invalid parameter '{value}' for {transformation}")
+        }
+        }
     }
 }
 
@@ -187,8 +187,16 @@ impl std::error::Error for ConfigError {}
 /// Edge case: an empty pipeline must return
 /// `(text.to_string(), String::new())` (see the `empty_pipeline` test).
 pub fn process(text: &str, pipeline: &[Box<dyn Transformation>]) -> (String, String) {
-    let _ = (text, pipeline);
-    todo!()
+    let (final_text, names): (String, Vec<&str>) = pipeline.iter().fold(
+        (text.to_string(), Vec::new()),
+        |(text, mut names), t| {
+            let text = t.apply(&text);
+            names.push(t.name());
+            (text, names)
+        },
+    );
+
+    (final_text, names.join(" -> "))
 }
 
 /// TODO: implement this. Split `config` on `,` to get one spec per
@@ -209,8 +217,35 @@ pub fn process(text: &str, pipeline: &[Box<dyn Transformation>]) -> (String, Str
 /// loop with early `return Err(...)`, or
 /// `.map(...).collect::<Result<Vec<_>, _>>()`, both work).
 pub fn parse_pipeline(config: &str) -> Result<Vec<Box<dyn Transformation>>, ConfigError> {
-    let _ = config;
-    todo!()
+    config
+        .split(',')
+        .map(|c| -> Result<Box<dyn Transformation>, ConfigError> {
+            let (nome, parametro) = match c.split_once(':') {
+                Some((n, p)) => (n, Some(p)),
+                None => (c, None),
+            };
+
+            match nome {
+                "trim" => Ok(Box::new(Trim)),
+                "upper" => Ok(Box::new(Upper)),
+                "censura" => {
+                    let word = parametro
+                        .ok_or_else(|| ConfigError::MissingParameter(nome.to_string()))?;
+                    Ok(Box::new(Censor { word: word.to_string() }))
+                }
+                "tronca" => {
+                    let value = parametro
+                        .ok_or_else(|| ConfigError::MissingParameter(nome.to_string()))?;
+                    let max: usize = value.parse().map_err(|_| ConfigError::InvalidParameter {
+                        transformation: nome.to_string(),
+                        value: value.to_string(),
+                    })?;
+                    Ok(Box::new(Truncate { max }))
+                }
+                _ => Err(ConfigError::UnknownTransformation(nome.to_string())),
+            }
+        })
+        .collect()
 }
 
 #[cfg(test)]

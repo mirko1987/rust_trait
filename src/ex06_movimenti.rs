@@ -58,8 +58,7 @@ pub enum LineError {
 /// case here, just a straightforward variant wrap.
 impl From<FieldError> for LineError {
     fn from(e: FieldError) -> Self {
-        let _ = e;
-        todo!()
+        LineError::Field(e)
     }
 }
 
@@ -84,8 +83,7 @@ impl From<FieldError> for LineError {
 /// construct the error).
 impl From<ParseFloatError> for FieldError {
     fn from(e: ParseFloatError) -> Self {
-        let _ = e;
-        todo!("careful: you don't have access to the original string here...")
+        FieldError::NonNumericAmount(e.to_string())
     }
 }
 
@@ -100,8 +98,22 @@ impl From<ParseFloatError> for FieldError {
 /// ORIGINAL (untouched) input string, not a partially parsed value: the
 /// tests check the error carries back exactly what was passed in.
 pub fn parse_date(field: &str) -> Result<Date, FieldError> {
-    let _ = field;
-    todo!()
+    let malformed = || FieldError::MalformedDate(field.to_string());
+
+    let parts: Vec<&str> = field.split('-').collect();
+    if parts.len() != 3 {
+        return Err(malformed());
+    }
+
+    let year: u16 = parts[0].parse().map_err(|_| malformed())?;
+    let month: u8 = parts[1].parse().map_err(|_| malformed())?;
+    let day: u8 = parts[2].parse().map_err(|_| malformed())?;
+
+    if !(1..=12).contains(&month) || !(1..=31).contains(&day) {
+        return Err(malformed());
+    }
+
+    Ok(Date { year, month, day })
 }
 
 /// Parses one line of the form `"date;description;amount"` into a
@@ -123,9 +135,26 @@ pub fn parse_date(field: &str) -> Result<Date, FieldError> {
 ///    per `?`, so a direct `ParseFloatError -> LineError` jump does NOT
 ///    happen automatically just because both intermediate `From` impls
 ///    exist; check how the types actually chain.
+/// Inner hop: `ParseFloatError -> FieldError`, isolated so the outer `?` in
+/// `parse_transaction` only ever has to perform the `FieldError -> LineError`
+/// hop (`?` performs one `From` conversion at a time).
+fn parse_amount(field: &str) -> Result<f64, FieldError> {
+    Ok(field.parse::<f64>()?)
+}
+
 pub fn parse_transaction(line: &str) -> Result<Transaction, LineError> {
-    let _ = line;
-    todo!("only `?` to propagate field-level errors")
+    let fields: Vec<&str> = line.split(';').collect();
+    let [date_field, description, amount_field] = fields[..] else {
+        return Err(LineError::WrongFieldCount(fields.len()));
+    };
+
+    let date = parse_date(date_field)?;
+    if description.is_empty() {
+        return Err(LineError::Field(FieldError::EmptyDescription));
+    }
+    let amount = parse_amount(amount_field)?;
+
+    Ok(Transaction { date, description: description.to_string(), amount })
 }
 
 /// Everything or the first error. Body: a single iterator expression.
@@ -137,8 +166,7 @@ pub fn parse_transaction(line: &str) -> Result<Transaction, LineError> {
 /// not write a manual loop; this should be one iterator chain ending in
 /// `.collect()`.
 pub fn import_all(statement: &str) -> Result<Vec<Transaction>, LineError> {
-    let _ = statement;
-    todo!()
+    statement.lines().map(parse_transaction).collect()
 }
 
 /// Doesn't stop on errors: returns (valid transactions, errors paired with
@@ -152,8 +180,17 @@ pub fn import_all(statement: &str) -> Result<Vec<Transaction>, LineError> {
 /// process every line regardless of earlier failures — no early return, no
 /// `?`.
 pub fn import_resilient(statement: &str) -> (Vec<Transaction>, Vec<(usize, LineError)>) {
-    let _ = statement;
-    todo!()
+    let mut valid = Vec::new();
+    let mut errors = Vec::new();
+
+    for (i, line) in statement.lines().enumerate() {
+        match parse_transaction(line) {
+            Ok(tx) => valid.push(tx),
+            Err(e) => errors.push((i, e)),
+        }
+    }
+
+    (valid, errors)
 }
 
 #[cfg(test)]
